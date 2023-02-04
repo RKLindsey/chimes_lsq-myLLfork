@@ -1523,40 +1523,88 @@ void NEIGHBORS::UPDATE_3B_INTERACTION(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)
 	INTERACTION_3B inter;
 
 	LIST_3B_INT.clear();
-
-	for ( int i = 0; i < SYSTEM.ATOMS; i++ ) 
-	{
-		int ai = i;
-		for ( int j = 0; j < LIST_3B[i].size(); j++ ) 
-		{
-			int aj = LIST_3B[i][j];
-			for ( int k = 0; k < LIST_3B[i].size(); k++ ) 
-			{
-				int ak = LIST_3B[i][k];
-
-				if ( aj == ak )
-				{
-					continue;
-				}
-				else if ( PERM_SCALE[3] == 1.0 && SYSTEM.PARENT[aj] > SYSTEM.PARENT[ak] )
-				{
-					 continue ;
-				}
+    
+    int ai, aj, ak;
+    
+    if (CONTROLS.USE_CHAINS)
+    {
+    	for ( int i = 0; i < SYSTEM.ATOMS; i++ ) 
+    	{
+            ai = i;
+            
+    		for ( int j = 0; j < LIST_3B[i].size(); j++ ) 
+    		{
+    			aj = LIST_3B[i][j];
+                
+    			for ( int k = 0; k < LIST_3B[aj].size(); k++ ) 
+    			{
+    			    ak = LIST_3B[j][k];
+                    
+    				if ( ai == ak )
+    				{
+    					continue;
+    				}
+    				else if ( PERM_SCALE[3] == 1.0 && SYSTEM.PARENT[ai] > SYSTEM.PARENT[ak] )
+    				{
+    					 continue ;
+    				}                    
 				
-				// The j-k list is possibly outside of the cutoff, so test it here.
-				double rlen = get_dist(SYSTEM, RAB, aj, ak);
+    				// The j-k list is possibly outside of the cutoff, so test it here.
+    				double rlen = get_dist(SYSTEM, RAB, aj, ak);
 	
-				if ( rlen < MAX_CUTOFF_3B + RCUT_PADDING ) 
-				{
-					inter.a1 = ai;
-					inter.a2 = aj;
-					inter.a3 = ak;
+    				if ( rlen < MAX_CUTOFF_3B + RCUT_PADDING ) 
+    				{
+    					inter.a1 = ai;
+    					inter.a2 = aj;
+    					inter.a3 = ak;
 	  
-					LIST_3B_INT.push_back(inter);
-				}
-			}
-		}
-	}
+    					LIST_3B_INT.push_back(inter);
+    				}
+    			}
+    		}
+    	}
+        
+    }
+    else
+    {
+    	for ( int i = 0; i < SYSTEM.ATOMS; i++ ) 
+    	{
+    		int ai = i;
+    		for ( int j = 0; j < LIST_3B[i].size(); j++ ) 
+    		{
+    			int aj = LIST_3B[i][j];
+    			for ( int k = 0; k < LIST_3B[i].size(); k++ ) 
+    			{
+    				int ak = LIST_3B[i][k];
+
+    				if ( aj == ak )
+    				{
+    					continue;
+    				}
+    				else if ( PERM_SCALE[3] == 1.0 && SYSTEM.PARENT[aj] > SYSTEM.PARENT[ak] )
+    				{
+    					 continue ;
+    				}
+				
+    				// The j-k list is possibly outside of the cutoff, so test it here.
+    				double rlen = get_dist(SYSTEM, RAB, aj, ak);
+	
+    				if ( rlen < MAX_CUTOFF_3B + RCUT_PADDING ) 
+    				{
+    					inter.a1 = ai;
+    					inter.a2 = aj;
+    					inter.a3 = ak;
+	  
+    					LIST_3B_INT.push_back(inter);
+    				}
+    			}
+    		}
+    	}
+    }
+        
+            
+
+
 #if VERBOSITY >= 1 
 	if ( RANK == 0 ) 
 	  cout << "Number of 3-body interactions = " << LIST_3B_INT.size() << endl ;
