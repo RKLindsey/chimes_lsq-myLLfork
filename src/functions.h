@@ -111,7 +111,7 @@ public:
 	bool   CHECK_FORCE;	      // If true, numerically check forces from derivatives of energy.
 	bool   COMPARE_FORCE;	      // Replaces if_read_force... If TRUE, read in read in a set of forces from a file for comparison with those computed by this code
 
-	bool   SUBTRACT_FORCE;        // Read frame, compute forces based on parameter file, print out frame where FF forces have been subtracted from input forces
+	bool   SUBTRACT_FORCE;     // Read frame, compute forces based on parameter file, print out frame where FF forces have been subtracted from input forces
 	string COMPARE_FILE;	      // Name of the file that holds the forces
 	double DELTA_T; 	      // Relaces deltat
 	double DELTA_T_FS;	      // Replaces deltat_fs... in femtoseconds
@@ -182,28 +182,30 @@ public:
 
 	bool IS_LSQ;		      // Is this for an lsq run or actual md?
 	bool FIT_STRESS;	      // Should stress tensors be included in the fit? --> This is ONLY for the diagonal components, xx, yy, zz
-	bool FIT_STRESS_ALL;	      // Should stress tensors be included in the fit? --> This is ONLY for ALL components, xx, xy, xz ... zz 
+	bool FIT_STRESS_ALL;	  // Should stress tensors be included in the fit? --> This is ONLY for ALL components, xx, xy, xz ... zz 
 	int  NSTRESS;		      // Only fit stresses for first NSTRESS frames of trajectory
 	bool FIT_ENER;  	      // Should the total frame energy be included in the fit?
-	bool FIT_ENER_EVER ;	      // Is energy ever included in the fit ?
+	bool FIT_ENER_EVER ;	  // Is energy ever included in the fit ?
 	int  NENER;
 	bool CALL_EWALD;	      // Should ewald subroutines be called?
 
 	int   NFRAMES;  	      // Number of frames in the movie file
 	int   CHEBY_ORDER;	      // Order of Chebyshev polynomial if used... set to 8 for DFTB Erep polynomial
-	int   CHEBY_3B_ORDER;	      // how many polynomials for 3b cheby?
-	int   CHEBY_4B_ORDER;	      // how many polynomials for 4b cheby?
+	int   CHEBY_3B_ORDER;	  // how many polynomials for 3b cheby?
+	int   CHEBY_4B_ORDER;	  // how many polynomials for 4b cheby?
 	int   NUM_3B_CHEBY;	      // How many parameters are associated with cheby order CHEBY_3B_ORDER?
 	int   NUM_4B_CHEBY;	      // How many parameters are associated with cheby order CHEBY_4B_ORDER?
 	int   INVR_PARAMS;	      // currently uses 19 parameters per pair type
-	int   TOT_SNUM; 		      // total number of 2-body force field parameters
-	int   TOT_SHORT_RANGE;        // Number of short ranged FF params... i.e. not Ewald
-	int   TOT_ALL_PARAMS ;        // Total number of LSQ fitting parameters.
+	int   TOT_SNUM; 		  // total number of 2-body force field parameters
+	int   TOT_SHORT_RANGE;    // Number of short ranged FF params... i.e. not Ewald
+	int   TOT_ALL_PARAMS ;    // Total number of LSQ fitting parameters.
 
-	bool  COUL_CONSV;	      // If true, constraints will be applied to charge fitting to try to maintain consistency
-	bool  IF_SUBTRACT_COORD;      // If true, subtract overcoordination forces.
-	bool  IF_SUBTRACT_COUL;       // If true, subtract Coulombic forces (for use with fixed charges).
-	bool  USE_PARTIAL_CHARGES;    // Will there be any charges in the system?
+	bool  COUL_CONSV;	       // If true, constraints will be applied to charge fitting to try to maintain consistency
+	bool  IF_SUBTRACT_COORD;   // If true, subtract overcoordination forces.
+	bool  IF_SUBTRACT_COUL;    // If true, subtract Coulombic forces (for use with fixed charges).
+	bool  USE_PARTIAL_CHARGES; // Will there be any charges in the system?
+    
+    bool USE_CHAINS;            // Should many-body correclation terms be included (i.e. chains)
 
 	Cheby_trans CHEBY_TYPE;       // How will distance be transformed?
 	vector<string> INFILE;        // Input trajectory file
@@ -253,6 +255,8 @@ public:
 		
 		FCUT_LINE = "CUBIC";
 		FIT_ENER_EVER = false ;
+        
+        USE_CHAINS = false;
 			
 
 		// Default is the same as the ChIMES calculator.

@@ -83,6 +83,7 @@ private:	// private funcitons
 
 	// For assigning LSQ variables: "Control Variables" 
 	
+    void PARSE_CONTROLS_USECHNS(JOB_CONTROL & CONTROLS);
 	void PARSE_CONTROLS_WRAPTRJ(JOB_CONTROL & CONTROLS);
 	void PARSE_CONTROLS_TRJFILE(JOB_CONTROL & CONTROLS);
 	void PARSE_CONTROLS_SPLITFI(JOB_CONTROL & CONTROLS);

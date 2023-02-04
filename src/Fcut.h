@@ -33,6 +33,9 @@ public:
 
 	// Evaluate the cut-off function.
 	void get_fcut(double & fcut, double & fcut_deriv, const double rlen, const double rmin, const double rmax) ;
+    
+    // Update fcut and fcut deriv based on poly order, if chains are used
+    void get_chains(int poly_order, double & fcut, double & fcut_deriv);
 
 	// Decide whether to proceed with a pair interaction.
 	bool PROCEED(const double & rlen, const double & rmin, const double & rmax) ;

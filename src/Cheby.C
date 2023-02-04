@@ -977,6 +977,18 @@ void Cheby::Deriv_3B(A_MAT & A_MATRIX, CLUSTER_LIST &TRIPS)
 	int a3start, a3end, a3;
 
 	double perm_scale = NEIGHBOR_LIST.PERM_SCALE[3] ;
+    
+    // Different handling of fcut proceed criteria depending on whether correlation terms (chains) are used
+    
+    int proceed;
+    int proceed_criteria;
+        
+    if (JOB_CONTROLS.USE_CHAINS) 
+        proceed_criteria = 2;
+    else
+        proceed_criteria = 3;
+    
+    
 	
 	for(int a1=a1start; a1<=a1end; a1++)		// Double sum over atom pairs -- MPI'd over SYSTEM.ATOMS (prev -1)
 	{
@@ -1045,206 +1057,223 @@ void Cheby::Deriv_3B(A_MAT & A_MATRIX, CLUSTER_LIST &TRIPS)
 				// Before doing any polynomial/coeff set up, make sure that all ij, ik, and jk distances are 
 				// within the allowed range.
 				// Unlike the 2-body Cheby, extrapolation/refitting to handle behavior outside of fitting regime is not straightforward.
-				
+                
+                
+                
+                // Different handling is needed depending on whether correlation terms (chains) are used. If not used, want original code behavior.
+                // If they are used, only need two distances within cutoff.
+
+                // Can convert this PROCEED function to return integers once chain support implemented for 4b too...
+
 				if( PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ij, S_MINIM_IJ, S_MAXIM_IJ))
-				{
-					if( PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ik, S_MINIM_IK, S_MAXIM_IK))
+				    proceed++;
+				if( PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ik, S_MINIM_IK, S_MAXIM_IK))
+					proceed++;
+				if( PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_jk, S_MINIM_JK, S_MAXIM_JK))
+					proceed++;
+                
+                if (proceed >= proceed_criteria)
+				{		
+					// Everything is within allowed ranges.
+					
+					// Track the minimum triplet distances for each given pair
+					
+					if (PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[0] == -1) 	// Then this is our first check. Just set all equal to current distances
 					{
-						if( PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_jk, S_MINIM_JK, S_MAXIM_JK))
-						{		
-							// Everything is within allowed ranges.
-							
-							// Track the minimum triplet distances for each given pair
-							
-							if (PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[0] == -1) 	// Then this is our first check. Just set all equal to current distances
-							{
-								PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[0]] = rlen_ij;
-								PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[1]] = rlen_ik;
-								PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[2]] = rlen_jk;
-							}
-							
-							// Case 2: If any distance is smaller than a previous distance
-							
-							else 
-							{
-								if (rlen_ij<PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[0]])
-									PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[0]] = rlen_ij;
-								
-								if (rlen_ik<PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[1]])
-									PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[1]] = rlen_ik;
-								
-								if (rlen_jk<PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[2]])
-									PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[2]] = rlen_jk;
-									
-							}
-				
-							// Add this to the number of configs contributing to a fit for this triplet type
-							
-							PAIR_TRIPLETS[curr_triple_type_index].N_CFG_CONTRIB++;
-
-							// Begin setting up the derivative calculation
-
-							// Set up the polynomials
-			
-							for ( int jj = 0 ; jj < 3 ; jj++ ) 
-							{
-							  x_avg [jj] = PAIR_TRIPLETS[curr_triple_type_index].X_AVG [pair_index[jj]] ;
-							  x_diff[jj] = PAIR_TRIPLETS[curr_triple_type_index].X_DIFF[pair_index[jj]] ;
-							}							
-							
-							set_polys(curr_pair_type_idx_ij, Tn_ij, Tnd_ij, rlen_ij, x_diff[0], x_avg[0],
-									  FF_2BODY[curr_pair_type_idx_ij].SNUM_3B_CHEBY, S_MINIM_IJ) ;
-							set_polys(curr_pair_type_idx_ik, Tn_ik, Tnd_ik, rlen_ik, x_diff[1], x_avg[1],
-									  FF_2BODY[curr_pair_type_idx_ik].SNUM_3B_CHEBY, S_MINIM_IK) ;
-							set_polys(curr_pair_type_idx_jk, Tn_jk, Tnd_jk, rlen_jk, x_diff[2], x_avg[2],
-									  FF_2BODY[curr_pair_type_idx_jk].SNUM_3B_CHEBY, S_MINIM_JK);			
-
-							// At this point we've completed all pre-calculations needed to populate the A matrix. Now we need to figure out 
-							// where within the matrix to put the data, and to do so. 
-
-							// Note: This syntax is safe since there is only one possible SNUM_3B_CHEBY value for all interactions
-
-							vstart = n_2b_cheby_terms;
-			
-							for (int i=0; i<curr_triple_type_index; i++)
-								vstart += PAIR_TRIPLETS[i].N_TRUE_ALLOWED_POWERS;						
-							
-							PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_fcut(fcut_ij, fcutderiv_ij, rlen_ij, S_MINIM_IJ, S_MAXIM_IJ);
-							PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_fcut(fcut_ik, fcutderiv_ik, rlen_ik, S_MINIM_IK, S_MAXIM_IK);
-							PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_fcut(fcut_jk, fcutderiv_jk, rlen_jk, S_MINIM_JK, S_MAXIM_JK);	
-							
-							// cout << "3B-EVAL, FCUT STYLE: " << PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.to_string() << endl;							
-		
-							/////////////////////////////////////////////////////////////////////
-							/////////////////////////////////////////////////////////////////////
-							// Consider special restrictions on allowed triplet types and powers
-							/////////////////////////////////////////////////////////////////////
-							/////////////////////////////////////////////////////////////////////
-			
-							row_offset = 0;
-			
-							// --- THE KEY HERE IS TO UNDERSTAND THAT THE IJ, IK, AND JK HERE IS BASED ON ATOM PAIRS, AND DOESN'T NECESSARILY MATCH THE TRIPLET'S EXPECTED ORDER!
-			
-							
-							fidx_a2 = SYSTEM.PARENT[a2];
-							fidx_a3 = SYSTEM.PARENT[a3];
-
-							vector<int> pair_idx(3) ;
-
-							for(int i=0; i<PAIR_TRIPLETS[curr_triple_type_index].N_ALLOWED_POWERS; i++) 
-							{
-							    row_offset = PAIR_TRIPLETS[curr_triple_type_index].PARAM_INDICES[i];
-								
-								 set_3b_powers(PAIR_TRIPLETS[curr_triple_type_index], pair_index, i,
-													pow_ij, pow_ik, pow_jk) ;
-
-								 deriv_ij =  fcut_ij * Tnd_ij[pow_ij] + fcutderiv_ij * Tn_ij[pow_ij] ;
-								 deriv_ik =  fcut_ik * Tnd_ik[pow_ik] + fcutderiv_ik * Tn_ik[pow_ik] ;
-								 deriv_jk =  fcut_jk * Tnd_jk[pow_jk] + fcutderiv_jk * Tn_jk[pow_jk] ;	
-								
-								 force_wo_coeff_ij = perm_scale * (deriv_ij * fcut_ik * fcut_jk * Tn_ik[pow_ik] * Tn_jk[pow_jk]);
-								
-								 force_wo_coeff_ik = perm_scale * (deriv_ik * fcut_ij * fcut_jk * Tn_ij[pow_ij] * Tn_jk[pow_jk]);
-								
-								 force_wo_coeff_jk = perm_scale * (deriv_jk * fcut_ij * fcut_ik * Tn_ij[pow_ij] * Tn_ik[pow_ik]) ;
+						PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[0]] = rlen_ij;
+						PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[1]] = rlen_ik;
+						PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[2]] = rlen_jk;
+					}
+					
+					// Case 2: If any distance is smaller than a previous distance
+					
+					else 
+					{
+						if (rlen_ij<PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[0]])
+							PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[0]] = rlen_ij;
 						
-								// ij pairs
+						if (rlen_ik<PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[1]])
+							PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[1]] = rlen_ik;
+						
+						if (rlen_jk<PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[2]])
+							PAIR_TRIPLETS[curr_triple_type_index].MIN_FOUND[pair_index[2]] = rlen_jk;
+							
+					}
+		
+					// Add this to the number of configs contributing to a fit for this triplet type
+					
+					PAIR_TRIPLETS[curr_triple_type_index].N_CFG_CONTRIB++;
 
-								A_MATRIX.FORCES[a1     ][vstart+row_offset].X += force_wo_coeff_ij * RAB_IJ.X / rlen_ij;
-								A_MATRIX.FORCES[fidx_a2][vstart+row_offset].X -= force_wo_coeff_ij * RAB_IJ.X / rlen_ij;
+					// Begin setting up the derivative calculation
 
-								A_MATRIX.FORCES[a1     ][vstart+row_offset].Y += force_wo_coeff_ij * RAB_IJ.Y / rlen_ij;
-								A_MATRIX.FORCES[fidx_a2][vstart+row_offset].Y -= force_wo_coeff_ij * RAB_IJ.Y / rlen_ij;
+					// Set up the polynomials
+	
+					for ( int jj = 0 ; jj < 3 ; jj++ ) 
+					{
+					  x_avg [jj] = PAIR_TRIPLETS[curr_triple_type_index].X_AVG [pair_index[jj]] ;
+					  x_diff[jj] = PAIR_TRIPLETS[curr_triple_type_index].X_DIFF[pair_index[jj]] ;
+					}							
+					
+					set_polys(curr_pair_type_idx_ij, Tn_ij, Tnd_ij, rlen_ij, x_diff[0], x_avg[0], FF_2BODY[curr_pair_type_idx_ij].SNUM_3B_CHEBY, S_MINIM_IJ) ;
+					set_polys(curr_pair_type_idx_ik, Tn_ik, Tnd_ik, rlen_ik, x_diff[1], x_avg[1], FF_2BODY[curr_pair_type_idx_ik].SNUM_3B_CHEBY, S_MINIM_IK) ;
+					set_polys(curr_pair_type_idx_jk, Tn_jk, Tnd_jk, rlen_jk, x_diff[2], x_avg[2], FF_2BODY[curr_pair_type_idx_jk].SNUM_3B_CHEBY, S_MINIM_JK);			
 
-								A_MATRIX.FORCES[a1     ][vstart+row_offset].Z += force_wo_coeff_ij * RAB_IJ.Z / rlen_ij;
-								A_MATRIX.FORCES[fidx_a2][vstart+row_offset].Z -= force_wo_coeff_ij * RAB_IJ.Z / rlen_ij;	
+					// At this point we've completed all pre-calculations needed to populate the A matrix. Now we need to figure out 
+					// where within the matrix to put the data, and to do so. 
+
+					// Note: This syntax is safe since there is only one possible SNUM_3B_CHEBY value for all interactions
+
+					vstart = n_2b_cheby_terms;
+	
+					for (int i=0; i<curr_triple_type_index; i++)
+						vstart += PAIR_TRIPLETS[i].N_TRUE_ALLOWED_POWERS;						
+					
+					PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_fcut(fcut_ij, fcutderiv_ij, rlen_ij, S_MINIM_IJ, S_MAXIM_IJ);
+					PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_fcut(fcut_ik, fcutderiv_ik, rlen_ik, S_MINIM_IK, S_MAXIM_IK);
+					PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_fcut(fcut_jk, fcutderiv_jk, rlen_jk, S_MINIM_JK, S_MAXIM_JK);	
+					
+					// cout << "3B-EVAL, FCUT STYLE: " << PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.to_string() << endl;							
+
+					/////////////////////////////////////////////////////////////////////
+					/////////////////////////////////////////////////////////////////////
+					// Consider special restrictions on allowed triplet types and powers
+					/////////////////////////////////////////////////////////////////////
+					/////////////////////////////////////////////////////////////////////
+	
+					row_offset = 0;
+	
+					// --- THE KEY HERE IS TO UNDERSTAND THAT THE IJ, IK, AND JK HERE IS BASED ON ATOM PAIRS, AND DOESN'T NECESSARILY MATCH THE TRIPLET'S EXPECTED ORDER!
+	
+					
+					fidx_a2 = SYSTEM.PARENT[a2];
+					fidx_a3 = SYSTEM.PARENT[a3];
+
+					vector<int> pair_idx(3) ;
+
+					for(int i=0; i<PAIR_TRIPLETS[curr_triple_type_index].N_ALLOWED_POWERS; i++) 
+					{
+					    row_offset = PAIR_TRIPLETS[curr_triple_type_index].PARAM_INDICES[i];
+						
+						set_3b_powers(PAIR_TRIPLETS[curr_triple_type_index], pair_index, i, pow_ij, pow_ik, pow_jk) ;
+                         
+                        // Now that we have our powers, need to see if this is still a valid chain interaction
+                         
+                         
+                        if(CONTROLS.USE_CHAINS)
+                        {
+                            get_chains(int pow_ij, double & fcut_ij, double & fcutderiv_ij);
+                            get_chains(int pow_ik, double & fcut_ik, double & fcutderiv_ik);
+                            get_chains(int pow_jk, double & fcut_jk, double & fcutderiv_jk);
+                        }
+                        
+
+						deriv_ij =  fcut_ij * Tnd_ij[pow_ij] + fcutderiv_ij * Tn_ij[pow_ij] ;
+						deriv_ik =  fcut_ik * Tnd_ik[pow_ik] + fcutderiv_ik * Tn_ik[pow_ik] ;
+						deriv_jk =  fcut_jk * Tnd_jk[pow_jk] + fcutderiv_jk * Tn_jk[pow_jk] ;	
+						
+						force_wo_coeff_ij = perm_scale * (deriv_ij * fcut_ik * fcut_jk * Tn_ik[pow_ik] * Tn_jk[pow_jk]);
+						
+						force_wo_coeff_ik = perm_scale * (deriv_ik * fcut_ij * fcut_jk * Tn_ij[pow_ij] * Tn_jk[pow_jk]);
+						
+						force_wo_coeff_jk = perm_scale * (deriv_jk * fcut_ij * fcut_ik * Tn_ij[pow_ij] * Tn_ik[pow_ik]) ;
+				
+						// ij pairs
+
+						A_MATRIX.FORCES[a1     ][vstart+row_offset].X += force_wo_coeff_ij * RAB_IJ.X / rlen_ij;
+						A_MATRIX.FORCES[fidx_a2][vstart+row_offset].X -= force_wo_coeff_ij * RAB_IJ.X / rlen_ij;
+
+						A_MATRIX.FORCES[a1     ][vstart+row_offset].Y += force_wo_coeff_ij * RAB_IJ.Y / rlen_ij;
+						A_MATRIX.FORCES[fidx_a2][vstart+row_offset].Y -= force_wo_coeff_ij * RAB_IJ.Y / rlen_ij;
+
+						A_MATRIX.FORCES[a1     ][vstart+row_offset].Z += force_wo_coeff_ij * RAB_IJ.Z / rlen_ij;
+						A_MATRIX.FORCES[fidx_a2][vstart+row_offset].Z -= force_wo_coeff_ij * RAB_IJ.Z / rlen_ij;	
 
 
-								// ik pairs
+						// ik pairs
 
-								A_MATRIX.FORCES[a1     ][vstart+row_offset].X += force_wo_coeff_ik * RAB_IK.X / rlen_ik;
-								A_MATRIX.FORCES[fidx_a3][vstart+row_offset].X -= force_wo_coeff_ik * RAB_IK.X / rlen_ik;
+						A_MATRIX.FORCES[a1     ][vstart+row_offset].X += force_wo_coeff_ik * RAB_IK.X / rlen_ik;
+						A_MATRIX.FORCES[fidx_a3][vstart+row_offset].X -= force_wo_coeff_ik * RAB_IK.X / rlen_ik;
 
-								A_MATRIX.FORCES[a1     ][vstart+row_offset].Y += force_wo_coeff_ik * RAB_IK.Y / rlen_ik;
-								A_MATRIX.FORCES[fidx_a3][vstart+row_offset].Y -= force_wo_coeff_ik * RAB_IK.Y / rlen_ik;
+						A_MATRIX.FORCES[a1     ][vstart+row_offset].Y += force_wo_coeff_ik * RAB_IK.Y / rlen_ik;
+						A_MATRIX.FORCES[fidx_a3][vstart+row_offset].Y -= force_wo_coeff_ik * RAB_IK.Y / rlen_ik;
 
-								A_MATRIX.FORCES[a1     ][vstart+row_offset].Z += force_wo_coeff_ik * RAB_IK.Z / rlen_ik;
-								A_MATRIX.FORCES[fidx_a3][vstart+row_offset].Z -= force_wo_coeff_ik * RAB_IK.Z / rlen_ik;
+						A_MATRIX.FORCES[a1     ][vstart+row_offset].Z += force_wo_coeff_ik * RAB_IK.Z / rlen_ik;
+						A_MATRIX.FORCES[fidx_a3][vstart+row_offset].Z -= force_wo_coeff_ik * RAB_IK.Z / rlen_ik;
 
-								// jk pairs
+						// jk pairs
 
-								A_MATRIX.FORCES[fidx_a2][vstart+row_offset].X += force_wo_coeff_jk * RAB_JK.X / rlen_jk;
-								A_MATRIX.FORCES[fidx_a3][vstart+row_offset].X -= force_wo_coeff_jk * RAB_JK.X / rlen_jk;
+						A_MATRIX.FORCES[fidx_a2][vstart+row_offset].X += force_wo_coeff_jk * RAB_JK.X / rlen_jk;
+						A_MATRIX.FORCES[fidx_a3][vstart+row_offset].X -= force_wo_coeff_jk * RAB_JK.X / rlen_jk;
 
-								A_MATRIX.FORCES[fidx_a2][vstart+row_offset].Y += force_wo_coeff_jk * RAB_JK.Y / rlen_jk;
-								A_MATRIX.FORCES[fidx_a3][vstart+row_offset].Y -= force_wo_coeff_jk * RAB_JK.Y / rlen_jk;
+						A_MATRIX.FORCES[fidx_a2][vstart+row_offset].Y += force_wo_coeff_jk * RAB_JK.Y / rlen_jk;
+						A_MATRIX.FORCES[fidx_a3][vstart+row_offset].Y -= force_wo_coeff_jk * RAB_JK.Y / rlen_jk;
 
-								A_MATRIX.FORCES[fidx_a2][vstart+row_offset].Z += force_wo_coeff_jk * RAB_JK.Z / rlen_jk;
-								A_MATRIX.FORCES[fidx_a3][vstart+row_offset].Z -= force_wo_coeff_jk * RAB_JK.Z / rlen_jk;
+						A_MATRIX.FORCES[fidx_a2][vstart+row_offset].Z += force_wo_coeff_jk * RAB_JK.Z / rlen_jk;
+						A_MATRIX.FORCES[fidx_a3][vstart+row_offset].Z -= force_wo_coeff_jk * RAB_JK.Z / rlen_jk;
 
-								if (CONTROLS.FIT_STRESS)
-								{
-								    // ij pairs
+						if (CONTROLS.FIT_STRESS)
+						{
+						    // ij pairs
 
-								    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_ij * RAB_IJ.X * RAB_IJ.X / rlen_ij;
-								    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_ij * RAB_IJ.Y * RAB_IJ.Y / rlen_ij;
-								    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_ij * RAB_IJ.Z * RAB_IJ.Z / rlen_ij; 
+						    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_ij * RAB_IJ.X * RAB_IJ.X / rlen_ij;
+						    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_ij * RAB_IJ.Y * RAB_IJ.Y / rlen_ij;
+						    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_ij * RAB_IJ.Z * RAB_IJ.Z / rlen_ij; 
 
-								    // ik pairs
+						    // ik pairs
 
-								    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_ik * RAB_IK.X * RAB_IK.X / rlen_ik;
-								    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_ik * RAB_IK.Y * RAB_IK.Y / rlen_ik;
-								    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_ik * RAB_IK.Z * RAB_IK.Z / rlen_ik;
+						    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_ik * RAB_IK.X * RAB_IK.X / rlen_ik;
+						    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_ik * RAB_IK.Y * RAB_IK.Y / rlen_ik;
+						    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_ik * RAB_IK.Z * RAB_IK.Z / rlen_ik;
 
-								    // jk pairs
+						    // jk pairs
 
-								    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_jk * RAB_JK.X * RAB_JK.X / rlen_jk;
-								    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_jk * RAB_JK.Y * RAB_JK.Y / rlen_jk;
-								    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_jk * RAB_JK.Z * RAB_JK.Z / rlen_jk;
-								    
-								}
-								
-								else if (CONTROLS.FIT_STRESS_ALL)
-								{
-								    // ij pairs: 
+						    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_jk * RAB_JK.X * RAB_JK.X / rlen_jk;
+						    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_jk * RAB_JK.Y * RAB_JK.Y / rlen_jk;
+						    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_jk * RAB_JK.Z * RAB_JK.Z / rlen_jk;
+						    
+						}
+						
+						else if (CONTROLS.FIT_STRESS_ALL)
+						{
+						    // ij pairs: 
 
-								    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_ij * RAB_IJ.X * RAB_IJ.X / rlen_ij;
-								    A_MATRIX.STRESSES[vstart+row_offset].XY -= force_wo_coeff_ij * RAB_IJ.X * RAB_IJ.Y / rlen_ij;
-								    A_MATRIX.STRESSES[vstart+row_offset].XZ -= force_wo_coeff_ij * RAB_IJ.X * RAB_IJ.Z / rlen_ij;	
-									
-								    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_ij * RAB_IJ.Y * RAB_IJ.Y / rlen_ij;
-								    A_MATRIX.STRESSES[vstart+row_offset].YZ -= force_wo_coeff_ij * RAB_IJ.Y * RAB_IJ.Z / rlen_ij;	
-								    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_ij * RAB_IJ.Z * RAB_IJ.Z / rlen_ij;
-									
-								    // ik pairs
+						    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_ij * RAB_IJ.X * RAB_IJ.X / rlen_ij;
+						    A_MATRIX.STRESSES[vstart+row_offset].XY -= force_wo_coeff_ij * RAB_IJ.X * RAB_IJ.Y / rlen_ij;
+						    A_MATRIX.STRESSES[vstart+row_offset].XZ -= force_wo_coeff_ij * RAB_IJ.X * RAB_IJ.Z / rlen_ij;	
+							
+						    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_ij * RAB_IJ.Y * RAB_IJ.Y / rlen_ij;
+						    A_MATRIX.STRESSES[vstart+row_offset].YZ -= force_wo_coeff_ij * RAB_IJ.Y * RAB_IJ.Z / rlen_ij;	
+						    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_ij * RAB_IJ.Z * RAB_IJ.Z / rlen_ij;
+							
+						    // ik pairs
 
-								    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_ik * RAB_IK.X * RAB_IK.X / rlen_ik;
-								    A_MATRIX.STRESSES[vstart+row_offset].XY -= force_wo_coeff_ik * RAB_IK.X * RAB_IK.Y / rlen_ik;
-								    A_MATRIX.STRESSES[vstart+row_offset].XZ -= force_wo_coeff_ik * RAB_IK.X * RAB_IK.Z / rlen_ik;
-									
-								    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_ik * RAB_IK.Y * RAB_IK.Y / rlen_ik;
-								    A_MATRIX.STRESSES[vstart+row_offset].YZ -= force_wo_coeff_ik * RAB_IK.Y * RAB_IK.Z / rlen_ik;
-								    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_ik * RAB_IK.Z * RAB_IK.Z / rlen_ik; 
-									
-								    // jk pairs
+						    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_ik * RAB_IK.X * RAB_IK.X / rlen_ik;
+						    A_MATRIX.STRESSES[vstart+row_offset].XY -= force_wo_coeff_ik * RAB_IK.X * RAB_IK.Y / rlen_ik;
+						    A_MATRIX.STRESSES[vstart+row_offset].XZ -= force_wo_coeff_ik * RAB_IK.X * RAB_IK.Z / rlen_ik;
+							
+						    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_ik * RAB_IK.Y * RAB_IK.Y / rlen_ik;
+						    A_MATRIX.STRESSES[vstart+row_offset].YZ -= force_wo_coeff_ik * RAB_IK.Y * RAB_IK.Z / rlen_ik;
+						    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_ik * RAB_IK.Z * RAB_IK.Z / rlen_ik; 
+							
+						    // jk pairs
 
-								    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_jk * RAB_JK.X * RAB_JK.X / rlen_jk;
-								    A_MATRIX.STRESSES[vstart+row_offset].XY -= force_wo_coeff_jk * RAB_JK.X * RAB_JK.Y / rlen_jk;
-								    A_MATRIX.STRESSES[vstart+row_offset].XZ -= force_wo_coeff_jk * RAB_JK.X * RAB_JK.Z / rlen_jk;		 
-									
-								    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_jk * RAB_JK.Y * RAB_JK.Y / rlen_jk;
-								    A_MATRIX.STRESSES[vstart+row_offset].YZ -= force_wo_coeff_jk * RAB_JK.Y * RAB_JK.Z / rlen_jk;	 
-								    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_jk * RAB_JK.Z * RAB_JK.Z / rlen_jk;					 
-								}
+						    A_MATRIX.STRESSES[vstart+row_offset].XX -= force_wo_coeff_jk * RAB_JK.X * RAB_JK.X / rlen_jk;
+						    A_MATRIX.STRESSES[vstart+row_offset].XY -= force_wo_coeff_jk * RAB_JK.X * RAB_JK.Y / rlen_jk;
+						    A_MATRIX.STRESSES[vstart+row_offset].XZ -= force_wo_coeff_jk * RAB_JK.X * RAB_JK.Z / rlen_jk;		 
+							
+						    A_MATRIX.STRESSES[vstart+row_offset].YY -= force_wo_coeff_jk * RAB_JK.Y * RAB_JK.Y / rlen_jk;
+						    A_MATRIX.STRESSES[vstart+row_offset].YZ -= force_wo_coeff_jk * RAB_JK.Y * RAB_JK.Z / rlen_jk;	 
+						    A_MATRIX.STRESSES[vstart+row_offset].ZZ -= force_wo_coeff_jk * RAB_JK.Z * RAB_JK.Z / rlen_jk;					 
+						}
 
-								if(CONTROLS.FIT_ENER) 
-								{
-									A_MATRIX.FRAME_ENERGIES[vstart+row_offset] += fcut_ij * fcut_ik * fcut_jk * Tn_ij[pow_ij] * Tn_ik[pow_ik] * Tn_jk[pow_jk] * perm_scale ;
-								}
-							}
-						} // end if rlen_jk within cutoffs...
-					} // end if rlen_ik within cutoffs...	
-				} // end third loop over atoms							
+						if(CONTROLS.FIT_ENER) 
+						{
+							A_MATRIX.FRAME_ENERGIES[vstart+row_offset] += fcut_ij * fcut_ik * fcut_jk * Tn_ij[pow_ij] * Tn_ik[pow_ik] * Tn_jk[pow_jk] * perm_scale ;
+						}
+					}
+				} // end if proceed
+
+					
 			}
 		}	
 	}

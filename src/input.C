@@ -443,6 +443,24 @@ void INPUT::PARSE_CONTROLS_WRAPTRJ(JOB_CONTROL & CONTROLS)
 	}
 }
 
+void INPUT::PARSE_CONTROLS_USECHNS(JOB_CONTROL & CONTROLS)
+{
+	int N_CONTENTS = CONTENTS.size();
+	
+	for (int i=0; i<N_CONTENTS; i++)
+	{	
+		if (found_input_keyword("USECHNS", CONTENTS(i)))
+		{
+			CONTROLS.USE_CHAINS = convert_bool(CONTENTS(i+1,0),i+1);
+			
+			if ( RANK == 0 ) 
+				cout << "	# USECHNS #: " << bool2str(CONTROLS.USE_CHAINS) << endl;	
+			
+			break;
+		}
+	}
+}
+
 void INPUT::PARSE_CONTROLS_SPLITFI(JOB_CONTROL & CONTROLS)
 {
 	int N_CONTENTS = CONTENTS.size();

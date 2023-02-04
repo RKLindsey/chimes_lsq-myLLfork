@@ -147,9 +147,9 @@ void NEIGHBORS::DO_UPDATE_SMALL(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)
 	// PERM_SCALE[n] is the scaling factor for the n-body interaction.
 	PERM_SCALE[0] = 1.0 ;
 	PERM_SCALE[1] = 1.0 ;	
-	for ( int j = 2 ; j < PERM_SCALE.size() ; j++ ) {
+	for ( int j = 2 ; j < PERM_SCALE.size() ; j++ ) 
 		PERM_SCALE[j] = PERM_SCALE[j-1] / j ;
-	}
+
 	
 	if(!FIRST_CALL)	// Clear out the second dimension so we can start over again
 	{
@@ -163,8 +163,13 @@ void NEIGHBORS::DO_UPDATE_SMALL(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)
 			LIST_4B[a1].clear();
 		}
 	}
+    
+    int UPPER_LIMIT = SYSTEM.ATOMS;
+    
+    if (CONTROLS.USE_CHAINS)
+        UPPER_LIMIT = SYSTEM.ALL_ATOMS;
 
-	for(int a1=0; a1<SYSTEM.ATOMS; a1++)
+	for(int a1=0; a1<UPPER_LIMIT; a1++)
 	{
 		for (int a2=0; a2<SYSTEM.ALL_ATOMS; a2++)
 		{
