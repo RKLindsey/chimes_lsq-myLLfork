@@ -71,9 +71,9 @@ void FCUT::get_fcut(double & fcut, double & fcut_deriv, const double rlen, const
 	}
 }
 
-void get_chains(int poly_order, double & fcut, double & fcut_deriv)
+void FCUT::get_chains(int poly_order, double & fcut, double & fcut_deriv)
 {
-    if (order == 0)
+    if (poly_order == 0)
     {
         fcut       = 1.0;
         fcut_deriv = 0;

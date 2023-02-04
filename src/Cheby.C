@@ -983,7 +983,7 @@ void Cheby::Deriv_3B(A_MAT & A_MATRIX, CLUSTER_LIST &TRIPS)
     int proceed;
     int proceed_criteria;
         
-    if (JOB_CONTROLS.USE_CHAINS) 
+    if (CONTROLS.USE_CHAINS) 
         proceed_criteria = 2;
     else
         proceed_criteria = 3;
@@ -1161,9 +1161,9 @@ void Cheby::Deriv_3B(A_MAT & A_MATRIX, CLUSTER_LIST &TRIPS)
                          
                         if(CONTROLS.USE_CHAINS)
                         {
-                            get_chains(int pow_ij, double & fcut_ij, double & fcutderiv_ij);
-                            get_chains(int pow_ik, double & fcut_ik, double & fcutderiv_ik);
-                            get_chains(int pow_jk, double & fcut_jk, double & fcutderiv_jk);
+                            PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_chains(pow_ij, fcut_ij, fcutderiv_ij);
+                            PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_chains(pow_ik, fcut_ik, fcutderiv_ik);
+                            PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_chains(pow_jk, fcut_jk, fcutderiv_jk);
                         }
                         
 
