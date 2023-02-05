@@ -1528,8 +1528,6 @@ void NEIGHBORS::UPDATE_3B_INTERACTION(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)
     
     if (CONTROLS.USE_CHAINS)
     {
-	cout << "in a" << endl;
-
     	for ( int i = 0; i < SYSTEM.ATOMS; i++ ) 
     	{
             ai = i;
@@ -1549,27 +1547,23 @@ void NEIGHBORS::UPDATE_3B_INTERACTION(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)
     					 continue ;
     				                    
 				
-    				// The j-k list is possibly outside of the cutoff, so test it here.
-    				double rlen = get_dist(SYSTEM, RAB, ai, ak);
+    				// For chain configurations, we don't care if ai and ak are outside of the cutoff
+    				//double rlen = get_dist(SYSTEM, RAB, ai, ak);
 	
-    				if ( rlen < MAX_CUTOFF_3B + RCUT_PADDING ) 
-    				{
+    				//if ( rlen < MAX_CUTOFF_3B + RCUT_PADDING ) 
+    				//{
     					inter.a1 = ai;
     					inter.a2 = aj;
     					inter.a3 = ak;
 	  
     					LIST_3B_INT.push_back(inter);
-    				}
+    				//}
     			}
     		}
-    	}
-
-	cout << "Finished a" << endl;
-        
+    	}  
     }
     else
     {
-	    cout << "in b" << endl;
     	for ( int i = 0; i < SYSTEM.ATOMS; i++ ) 
     	{
     		int ai = i;
@@ -1622,58 +1616,118 @@ void NEIGHBORS::UPDATE_4B_INTERACTION(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)
 	INTERACTION_4B inter;
 	LIST_4B_INT.clear();
 	int ai, aj, ak, al;
-	
-	for (int i=0; i<SYSTEM.ATOMS; i++)	// Loop over all real atoms
-	{
-		ai = i;
-		
-		for (int j=0; j<LIST_4B[i].size(); j++) // Loop over all neighbors of i to get atom j
-		{
-			aj = LIST_4B[i][j];
-			
-			for (int k=0; k<LIST_4B[i].size(); k++) // Loop over all neighbors of i to get atom k
-			{
 
-			  ak = LIST_4B[i][k];
-				
-			  if (aj == ak )
-				 continue;
+    if (CONTROLS.USE_CHAINS)
+    {
+    	for ( int i = 0; i < SYSTEM.ATOMS; i++ ) 
+    	{
+            ai = i;
+            
+    		for ( int j = 0; j < LIST_3B[ai].size(); j++ ) 
+    		{
+    			aj = LIST_4B[ai][j];
+                
+    			for ( int k = 0; k < LIST_4B[aj].size(); k++ ) 
+    			{
+    			    ak = LIST_4B[aj][k];
+                    
+    				if ( ai == ak )
+    					continue;
+    				
+    				else if (( PERM_SCALE[3] == 1.0) && (SYSTEM.PARENT[ai] > SYSTEM.PARENT[ak]) )
+    					 continue ;
+    				
+                    
+                    // For chain configurations, don't care if ai and ak are within cutoff                                      
+                    //if( get_dist(SYSTEM, RAB, ai, ak) >  MAX_CUTOFF_4B + RCUT_PADDING)
+        			// continue;
+                     
+        			for (int l=0; l<LIST_4B[ak].size(); l++) // Loop over all neighbors of i to get atom l
+        			{
+        				al = LIST_4B[ak][l];
+        			
+        				// Check that this is a valid quadruplet
 
-			  if( PERM_SCALE[4] == 1.0 && SYSTEM.PARENT[aj] > SYSTEM.PARENT[ak] )
-				 continue;
+        				if (aj == al || ai == al)
+        					continue;
+        				
+        				if( PERM_SCALE[4] == 1.0 && (SYSTEM.PARENT[ai] > SYSTEM.PARENT[al] || SYSTEM.PARENT[aj] > SYSTEM.PARENT[al]) )
+        					continue;
+        				
+        				
+                        // For chain configurations, don't care if aj and al are within cutoff   
+                        
+        				//if( get_dist(SYSTEM, RAB, aj, al) >=  MAX_CUTOFF_4B + RCUT_PADDING)
+        				//	continue;
+        				
+        				inter.a1 = ai;
+        				inter.a2 = aj;
+        				inter.a3 = ak;
+        				inter.a4 = al;
+        				
+        				LIST_4B_INT.push_back(inter);
+        			}                     
+    			}
+    		}
+    	}
 
-			  if( get_dist(SYSTEM, RAB, aj, ak) >  MAX_CUTOFF_4B + RCUT_PADDING)
-				 continue;
+    }
+    else
+    {
+        for (int i=0; i<SYSTEM.ATOMS; i++)	// Loop over all real atoms
+        {
+        	ai = i;
+        	
+        	for (int j=0; j<LIST_4B[i].size(); j++) // Loop over all neighbors of i to get atom j
+        	{
+        		aj = LIST_4B[i][j];
+        		
+        		for (int k=0; k<LIST_4B[i].size(); k++) // Loop over all neighbors of i to get atom k
+        		{
 
-				for (int l=0; l<LIST_4B[i].size(); l++) // Loop over all neighbors of i to get atom l
-				{
-					al = LIST_4B[i][l];
-				
-					// Check that this is a valid quadruplet
+        		  ak = LIST_4B[i][k];
+        			
+        		  if (aj == ak )
+        			 continue;
 
-					if (aj == al || ak == al)
-						continue;
-					
-					if( PERM_SCALE[4] == 1.0 && (SYSTEM.PARENT[ak] > SYSTEM.PARENT[al] || SYSTEM.PARENT[aj] > SYSTEM.PARENT[al]) )
-						continue;
-					
-					// We know ij, ik, il, and jk distances are within the allowed cutoffs, but we still need to check jl, and kl
+        		  if( PERM_SCALE[4] == 1.0 && SYSTEM.PARENT[aj] > SYSTEM.PARENT[ak] )
+        			 continue;
 
-					if( get_dist(SYSTEM, RAB, aj, al) >=  MAX_CUTOFF_4B + RCUT_PADDING)
-						continue;
-					if( get_dist(SYSTEM, RAB, ak, al) >=  MAX_CUTOFF_4B + RCUT_PADDING)
-						continue;
-					
-					inter.a1 = ai;
-					inter.a2 = aj;
-					inter.a3 = ak;
-					inter.a4 = al;
-					
-					LIST_4B_INT.push_back(inter);
-				}
-			}
-		}
-	}
+        		  if( get_dist(SYSTEM, RAB, aj, ak) >  MAX_CUTOFF_4B + RCUT_PADDING)
+        			 continue;
+
+        			for (int l=0; l<LIST_4B[i].size(); l++) // Loop over all neighbors of i to get atom l
+        			{
+        				al = LIST_4B[i][l];
+        			
+        				// Check that this is a valid quadruplet
+
+        				if (aj == al || ak == al)
+        					continue;
+        				
+        				if( PERM_SCALE[4] == 1.0 && (SYSTEM.PARENT[ak] > SYSTEM.PARENT[al] || SYSTEM.PARENT[aj] > SYSTEM.PARENT[al]) )
+        					continue;
+        				
+        				// We know ij, ik, il, and jk distances are within the allowed cutoffs, but we still need to check jl, and kl
+
+        				if( get_dist(SYSTEM, RAB, aj, al) >=  MAX_CUTOFF_4B + RCUT_PADDING)
+        					continue;
+        				if( get_dist(SYSTEM, RAB, ak, al) >=  MAX_CUTOFF_4B + RCUT_PADDING)
+        					continue;
+        				
+        				inter.a1 = ai;
+        				inter.a2 = aj;
+        				inter.a3 = ak;
+        				inter.a4 = al;
+        				
+        				LIST_4B_INT.push_back(inter);
+        			}
+        		}
+        	}
+        }
+    }
+
+
 #if VERBOSITY >= 1 
 	if ( RANK == 0 ) 
 	  cout << "Number of 4-body interactions = " << LIST_4B_INT.size() << endl ;

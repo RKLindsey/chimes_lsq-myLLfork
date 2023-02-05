@@ -2192,6 +2192,8 @@ static void parse_ff_controls(string &LINE, ifstream &PARAMFILE, JOB_CONTROL &CO
 		CONTROLS.USE_3B_CHEBY = is_true(tokens[1]) ;
 	 else if ( tokens[0] == "USE4BCH:" )
 		CONTROLS.USE_4B_CHEBY = is_true(tokens[1]) ;
+	 else if ( tokens[0] == "USECHNS:")
+		 CONTROLS.USE_CHAINS = is_true(tokens[1]) ;
 
 	 getline(PARAMFILE, LINE) ;
 	 if ( ! PARAMFILE.good() )

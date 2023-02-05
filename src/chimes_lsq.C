@@ -580,7 +580,11 @@ static void print_param_header(JOB_CONTROL &CONTROLS, vector<PAIRS> &ATOM_PAIRS,
 	if(CONTROLS.USE_4B_CHEBY)
 		header << "USE4BCH: true" << endl;
 	else
-		header << "USE4BCH: false" << endl;	
+		header << "USE4BCH: false" << endl;
+	if(CONTROLS.USE_CHAINS)
+		header << "USECHNS: true" << endl;
+	else
+		header << "USECHNS: false" << endl;	
 	
 	header << endl << "PAIRTYP: " << ATOM_PAIRS[0].PAIRTYP << " ";
 	

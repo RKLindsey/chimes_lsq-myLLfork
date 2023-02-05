@@ -322,6 +322,7 @@ def main():
 
     ATOM_TRIPS_LINE = 0
     ATOM_QUADS_LINE = 0
+    POTENTIAL_LINE  = 0
     TOTAL_TRIPS = 0
     TOTAL_QUADS = 0
 
@@ -329,9 +330,12 @@ def main():
         print (hf[i].rstrip('\n'))
         TEMP = hf[i].split()
         
-        if "EXCL_2B" in hf[i]:
+        if "PAIRTYP" in hf[i]:
+            POTENTIAL_LINE = i
+            
+        if "EXCL_2B" in hf[i]:  
             line = line.split()
-            EXCL_2B = line[1:]
+            EXCL_2B = line[1:]  
 
         if len(TEMP)>3:
             if (TEMP[2] == "TRIPLETS:"):
@@ -352,7 +356,7 @@ def main():
 
     # 1. Figure out what potential type we have
 
-    POTENTIAL = hf[5].split()
+    POTENTIAL = hf[POTENTIAL_LINE].split()
     POTENTIAL = POTENTIAL[1]
 
     print ("")
@@ -366,7 +370,7 @@ def main():
 
     if POTENTIAL == "CHEBYSHEV":
         
-        TMP = hf[5].split()
+        TMP = hf[POTENTIAL_LINE].split()
 
         if len(TMP) >= 4:
             if len(TMP) >= 5:
@@ -380,7 +384,7 @@ def main():
     FIT_COUL = hf[1].split()
     FIT_COUL = FIT_COUL[1]
 
-    ATOM_TYPES_LINE  = 7
+    ATOM_TYPES_LINE  = POTENTIAL_LINE+2
     TOTAL_ATOM_TYPES = hf[ATOM_TYPES_LINE].split()
     TOTAL_ATOM_TYPES = int(TOTAL_ATOM_TYPES[2])
     ATOM_PAIRS_LINE  = ATOM_TYPES_LINE+2+TOTAL_ATOM_TYPES+2
@@ -600,7 +604,7 @@ def main():
 
     total_params = TOTAL_PAIRS * SNUM_2B + COUNTED_TRIP_PARAMS + COUNTED_QUAD_PARAMS + COUNTED_COUL_PARAMS 
 
-    N_ENER_OFFSETS = int(hf[7].split()[2])
+    N_ENER_OFFSETS = int(hf[ATOM_TYPES_LINE].split()[2])
 
 ## Parameter count could be off by natom_types, if energies are included in the fit
     if (total_params != len(x)) and (len(x) != (total_params+N_ENER_OFFSETS)) :

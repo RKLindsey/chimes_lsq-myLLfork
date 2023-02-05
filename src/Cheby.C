@@ -1428,6 +1428,18 @@ void Cheby::Deriv_4B(A_MAT & A_MATRIX, int n_3b_cheby_terms, CLUSTER_LIST& QUADS
 	int a4start, a4end, a4;	
 
 	double perm_scale = NEIGHBOR_LIST.PERM_SCALE[4] ;
+    
+    
+    // Different handling of fcut proceed criteria depending on whether correlation terms (chains) are used
+    
+    bool proceed_ij, proceed_ik, proceed_il, proceed_jk, proceed_jl, proceed_kl;
+    int proceed;
+    int proceed_criteria;
+        
+    if (CONTROLS.USE_CHAINS) 
+        proceed_criteria = 3;
+    else
+        proceed_criteria = 6;    
 	
 	for(int a1=a1start; a1<=a1end; a1++)		// Double sum over atom pairs -- MPI'd over SYSTEM.ATOMS (prev -1)
 	{
@@ -1530,19 +1542,31 @@ void Cheby::Deriv_4B(A_MAT & A_MATRIX, int n_3b_cheby_terms, CLUSTER_LIST& QUADS
 						
 					// Before doing any polynomial/coeff set up, make sure that all ij, ik, and jk distances are within the allowed range.
 					// Unlike the 2-body Cheby, extrapolation/refitting to handle behavior outside of fitting regime is not straightforward.
-					
-					if( !PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[0], S_MINIM[0], S_MAXIM[0]))
-						continue;
-					if( !PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[1], S_MINIM[1], S_MAXIM[1]))
-						continue;
-					if( !PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[2], S_MINIM[2], S_MAXIM[2]))
-						continue;
-					if( !PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[3], S_MINIM[3], S_MAXIM[3]))
-						continue;
-					if( !PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[4], S_MINIM[4], S_MAXIM[4]))
-						continue;
-					if( !PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[5], S_MINIM[5], S_MAXIM[5]))
-						continue;			
+                    
+                    
+                    // Different handling is needed depending on whether correlation terms (chains) are used. If not used, want original code behavior.
+                    // If they are used, only need two distances within cutoff.
+
+                    // Can convert this PROCEED function to return integers once chain support implemented for 4b too...
+                
+		            proceed = 0;
+                
+                    proceed_ij = PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[0], S_MINIM[0], S_MAXIM[0]);
+                    proceed_ik = PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[1], S_MINIM[1], S_MAXIM[1]);
+                    proceed_il = PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[2], S_MINIM[2], S_MAXIM[2]);
+                    proceed_jk = PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[3], S_MINIM[3], S_MAXIM[3]);
+                    proceed_jl = PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[4], S_MINIM[4], S_MAXIM[4]);
+                    proceed_kl = PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[5], S_MINIM[5], S_MAXIM[5]);
+
+				    if( proceed_ij) proceed++;
+				    if( proceed_ik) proceed++;
+				    if( proceed_il) proceed++;
+                    if( proceed_jk) proceed++;
+                    if( proceed_jl) proceed++;
+                    if( proceed_kl) proceed++;     
+                    
+                    if (proceed < proceed_criteria)      
+                        continue;             
 					
 					// cout << "4B-EVAL, FCUT STYLE: " << PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.to_string() << endl;
 					
@@ -1573,18 +1597,12 @@ void Cheby::Deriv_4B(A_MAT & A_MATRIX, int n_3b_cheby_terms, CLUSTER_LIST& QUADS
 
 					// Set up the polynomials
 	
-					set_polys(curr_pair_type_idx[0], Tn_ij, Tnd_ij, rlen[0], x_diff[0], x_avg[0],
-							  FF_2BODY[curr_pair_type_idx[0]].SNUM_4B_CHEBY, S_MINIM[0]) ;
-					set_polys(curr_pair_type_idx[1], Tn_ik, Tnd_ik, rlen[1], x_diff[1], x_avg[1],
-							  FF_2BODY[curr_pair_type_idx[1]].SNUM_4B_CHEBY, S_MINIM[1]);
-					set_polys(curr_pair_type_idx[2], Tn_il, Tnd_il, rlen[2], x_diff[2], x_avg[2],
-							  FF_2BODY[curr_pair_type_idx[2]].SNUM_4B_CHEBY, S_MINIM[2]);
-					set_polys(curr_pair_type_idx[3], Tn_jk, Tnd_jk, rlen[3], x_diff[3], x_avg[3],
-							  FF_2BODY[curr_pair_type_idx[3]].SNUM_4B_CHEBY, S_MINIM[3]);
-					set_polys(curr_pair_type_idx[4], Tn_jl, Tnd_jl, rlen[4], x_diff[4], x_avg[4],
-							  FF_2BODY[curr_pair_type_idx[4]].SNUM_4B_CHEBY, S_MINIM[4]);
-					set_polys(curr_pair_type_idx[5], Tn_kl, Tnd_kl, rlen[5], x_diff[5], x_avg[5],
-							  FF_2BODY[curr_pair_type_idx[5]].SNUM_4B_CHEBY, S_MINIM[5]);
+					set_polys(curr_pair_type_idx[0], Tn_ij, Tnd_ij, rlen[0], x_diff[0], x_avg[0],FF_2BODY[curr_pair_type_idx[0]].SNUM_4B_CHEBY, S_MINIM[0]) ;
+					set_polys(curr_pair_type_idx[1], Tn_ik, Tnd_ik, rlen[1], x_diff[1], x_avg[1],FF_2BODY[curr_pair_type_idx[1]].SNUM_4B_CHEBY, S_MINIM[1]);
+					set_polys(curr_pair_type_idx[2], Tn_il, Tnd_il, rlen[2], x_diff[2], x_avg[2],FF_2BODY[curr_pair_type_idx[2]].SNUM_4B_CHEBY, S_MINIM[2]);
+					set_polys(curr_pair_type_idx[3], Tn_jk, Tnd_jk, rlen[3], x_diff[3], x_avg[3],FF_2BODY[curr_pair_type_idx[3]].SNUM_4B_CHEBY, S_MINIM[3]);
+					set_polys(curr_pair_type_idx[4], Tn_jl, Tnd_jl, rlen[4], x_diff[4], x_avg[4],FF_2BODY[curr_pair_type_idx[4]].SNUM_4B_CHEBY, S_MINIM[4]);
+					set_polys(curr_pair_type_idx[5], Tn_kl, Tnd_kl, rlen[5], x_diff[5], x_avg[5],FF_2BODY[curr_pair_type_idx[5]].SNUM_4B_CHEBY, S_MINIM[5]);
 
 					// At this point we've completed all pre-calculations needed to populate the A matrix. Now we need to figure out 
 					// where within the matrix to put the data, and to do so. 
@@ -1598,7 +1616,7 @@ void Cheby::Deriv_4B(A_MAT & A_MATRIX, int n_3b_cheby_terms, CLUSTER_LIST& QUADS
 
 					for (int f=0; f<6; f++)
 						PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.get_fcut(fcut[f], fcut_deriv[f], rlen[f], S_MINIM[f], S_MAXIM[f]);
-	
+                        
 					/////////////////////////////////////////////////////////////////////
 					/////////////////////////////////////////////////////////////////////
 					// Consider special restrictions on allowed quadruplet types and powers
@@ -1611,11 +1629,42 @@ void Cheby::Deriv_4B(A_MAT & A_MATRIX, int n_3b_cheby_terms, CLUSTER_LIST& QUADS
 	
 					for(int i=0; i<PAIR_QUADRUPLETS[curr_quad_type_index].N_ALLOWED_POWERS; i++) 
 					{
-					    	row_offset = PAIR_QUADRUPLETS[curr_quad_type_index].PARAM_INDICES[i];
+					    row_offset = PAIR_QUADRUPLETS[curr_quad_type_index].PARAM_INDICES[i];
 						
 						for (int f=0; f<6; f++)	
 							powers[f] = PAIR_QUADRUPLETS[curr_quad_type_index].ALLOWED_POWERS[i][pow_map[f]];
-						
+                            
+                            
+                            
+                         // Now that we have our powers, need to see if this is still a valid chain interaction
+                         
+                         if (proceed == 3) // If we're here with proceed == 2, then this is a USE_CHAINS calculation with a chain configuration
+                         {
+                             // In this case, need the powers corresponding to the two distances within cutoffs to be > 0
+                             if ((proceed_ij) && (powers[0] == 0)) 
+                                 continue;
+                             if ((proceed_ik) && (powers[1] == 0))
+                                 continue;
+                             if ((proceed_il) && (powers[2] == 0))
+                                 continue;              
+                             if ((proceed_jk) && (powers[3] == 0)) 
+                                 continue;
+                             if ((proceed_jl) && (powers[4] == 0))
+                                 continue;
+                             if ((proceed_kl) && (powers[5] == 0))
+                                 continue;                                    
+                         }                                                  
+                          
+                         if(CONTROLS.USE_CHAINS)
+                         {
+                             PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[0], fcut[0], fcut_deriv[0]);
+                             PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[1], fcut[1], fcut_deriv[1]);
+                             PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[2], fcut[2], fcut_deriv[2]);
+                             PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[3], fcut[3], fcut_deriv[3]);
+                             PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[4], fcut[4], fcut_deriv[4]);
+                             PAIR_QUADRUPLETS[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[5], fcut[5], fcut_deriv[5]);
+                         }
+
 						deriv[0] = perm_scale * (fcut[0] * Tnd_ij[powers[0]] + fcut_deriv[0] * Tn_ij[powers[0]]) ;
 						deriv[1] = perm_scale * (fcut[1] * Tnd_ik[powers[1]] + fcut_deriv[1] * Tn_ik[powers[1]]) ;
 						deriv[2] = perm_scale * (fcut[2] * Tnd_il[powers[2]] + fcut_deriv[2] * Tn_il[powers[2]]) ;
@@ -2126,6 +2175,17 @@ void Cheby::Force_3B(CLUSTER_LIST &TRIPS)
 		
   int a1;
   int INTERACTIONS = 0;
+  
+  // Different handling of fcut proceed criteria depending on whether correlation terms (chains) are used
+    
+  bool proceed_ij, proceed_ik, proceed_jk;
+  int proceed;
+  int proceed_criteria;
+      
+  if (CONTROLS.USE_CHAINS) 
+      proceed_criteria = 2;
+  else
+      proceed_criteria = 3;
 
   // Loop over a1, a2, a3 interaction triples, not atoms
 
@@ -2145,12 +2205,9 @@ void Cheby::Force_3B(CLUSTER_LIST &TRIPS)
 	 atom_type_index[1] = SYSTEM.get_atomtype_idx(a2) ;
 	 atom_type_index[2] = SYSTEM.get_atomtype_idx(a3) ;
 
-	 curr_pair_type_idx_ij =  get_pair_index(a1, a2, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP,
-														  SYSTEM.PARENT) ;
-	 curr_pair_type_idx_ik =  get_pair_index(a1, a3, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP,
-														  SYSTEM.PARENT) ;
-	 curr_pair_type_idx_jk =  get_pair_index(a2, a3, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP,
-														  SYSTEM.PARENT) ;
+	 curr_pair_type_idx_ij =  get_pair_index(a1, a2, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP, SYSTEM.PARENT) ;
+	 curr_pair_type_idx_ik =  get_pair_index(a1, a3, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP, SYSTEM.PARENT) ;
+	 curr_pair_type_idx_jk =  get_pair_index(a2, a3, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP, SYSTEM.PARENT) ;
 
 	 int tidx = TRIPS.make_id_int(atom_type_index) ;
 	 curr_triple_type_index = TRIPS.INT_MAP[tidx];
@@ -2169,9 +2226,9 @@ void Cheby::Force_3B(CLUSTER_LIST &TRIPS)
 	 for ( int j = 0 ; j < 3 ; j++ ) 
 	 {
 		pair_index[j] = TRIPS.PAIR_INDICES[tidx][j] ;
-		s_maxim[j] = FF_3BODY[curr_triple_type_index].S_MAXIM[pair_index[j]] ;
-		s_minim[j] = FF_3BODY[curr_triple_type_index].S_MINIM[pair_index[j]] ;
-		x_diff[j]  = FF_3BODY[curr_triple_type_index].X_DIFF[pair_index[j]] ;
+		s_maxim[j]    = FF_3BODY[curr_triple_type_index].S_MAXIM[pair_index[j]] ;
+		s_minim[j]    = FF_3BODY[curr_triple_type_index].S_MINIM[pair_index[j]] ;
+		x_diff[j]     = FF_3BODY[curr_triple_type_index].X_DIFF[pair_index[j]] ;
 		x_avg[j]	  = FF_3BODY[curr_triple_type_index].X_AVG[pair_index[j]] ;
 	 }
 					
@@ -2179,13 +2236,27 @@ void Cheby::Force_3B(CLUSTER_LIST &TRIPS)
 	 // within the allowed range.
 	 
 
+     // Different handling is needed depending on whether correlation terms (chains) are used. If not used, want original code behavior.
+     // If they are used, only need two distances within cutoff.
 
-	 if ( FF_3BODY[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ij, s_minim[0], s_maxim[0]) )
-	 {
-		if ( FF_3BODY[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ik, s_minim[1], s_maxim[1]))
-		{
-		  if ( FF_3BODY[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_jk, s_minim[2], s_maxim[2]) )
-		  {											
+     // Can convert this PROCEED function to return integers once chain support implemented for 4b too...
+     
+
+	 proceed = 0;
+     
+     proceed_ij = FF_3BODY[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ij, s_minim[0], s_maxim[0]);
+     proceed_ik = FF_3BODY[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ik, s_minim[1], s_maxim[1]);
+     proceed_jk = FF_3BODY[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_jk, s_minim[2], s_maxim[2]);
+
+	 if( proceed_ij) proceed++;
+	 if( proceed_ik) proceed++;
+	 if( proceed_jk) proceed++;
+
+
+
+
+	 if (proceed >= proceed_criteria)
+	 {								
 			 // Everything is within allowed ranges. Begin setting up the force calculation
 			  
 			 INTERACTIONS++;
@@ -2223,9 +2294,28 @@ void Cheby::Force_3B(CLUSTER_LIST &TRIPS)
 							
 			 for(int i=0; i<FF_3BODY[curr_triple_type_index].N_ALLOWED_POWERS; i++) 
 			 {
-				set_3b_powers(FF_3BODY[curr_triple_type_index], pair_index, i,
-								  pow_ij, pow_ik, pow_jk) ;
+				set_3b_powers(FF_3BODY[curr_triple_type_index], pair_index, i, pow_ij, pow_ik, pow_jk) ;
 			      
+                // Now that we have our powers, need to see if this is still a valid chain interaction
+                
+                if (proceed == 2) // If we're here with proceed == 2, then this is a USE_CHAINS calculation with a chain configuration
+                {
+                    // In this case, need the powers corresponding to the two distances within cutoffs to be > 0
+                    if ((proceed_ij) && (pow_ij == 0)) 
+                        continue;
+                    if ((proceed_ik) && (pow_ik == 0))
+                        continue;
+                    if ((proceed_jk) && (pow_jk == 0))
+                        continue;   
+                }                                                  
+                 
+                if(CONTROLS.USE_CHAINS)
+                {
+                    FF_3BODY[curr_triple_type_index].FORCE_CUTOFF.get_chains(pow_ij, fcut_ij, fcutderiv_ij);
+                    FF_3BODY[curr_triple_type_index].FORCE_CUTOFF.get_chains(pow_ik, fcut_ik, fcutderiv_ik);
+                    FF_3BODY[curr_triple_type_index].FORCE_CUTOFF.get_chains(pow_jk, fcut_jk, fcutderiv_jk);
+                }  
+  
 				coeff = perm_scale * FF_3BODY[curr_triple_type_index].PARAMS[i] ;
 			      
 				SYSTEM.TOT_POT_ENER += coeff * fcut_ij * fcut_ik * fcut_jk * Tn_ij[pow_ij] * Tn_ik[pow_ik] * Tn_jk[pow_jk]; 
@@ -2337,9 +2427,7 @@ void Cheby::Force_3B(CLUSTER_LIST &TRIPS)
 				FORCE_3B[fidx_a3].Y -= force_jk * RAB_JK.Y;
 				FORCE_3B[fidx_a3].Z -= force_jk * RAB_JK.Z;										
 #endif								
-			 }	
-		  }	
-		}				
+			 }				
 	 }		
   } 	// Loop over interactions. 
 }
@@ -2426,7 +2514,18 @@ void Cheby::Force_4B(CLUSTER_LIST &QUADS)
 		
   // Loop over a1, a2, a3, a4 interaction quadruplets, not atoms
 
-	double perm_scale = NEIGHBOR_LIST.PERM_SCALE[4] ;
+  double perm_scale = NEIGHBOR_LIST.PERM_SCALE[4] ;
+    
+  // Different handling of fcut proceed criteria depending on whether correlation terms (chains) are used
+    
+  bool proceed_ij, proceed_ik, proceed_il, proceed_jk, proceed_jl, proceed_kl;
+  int proceed;
+  int proceed_criteria;
+      
+  if (CONTROLS.USE_CHAINS) 
+      proceed_criteria = 3;
+  else
+      proceed_criteria = 6;      
 	
   for ( int ii = i_start; ii <= i_end; ii++ ) 
   {
@@ -2441,18 +2540,12 @@ void Cheby::Force_4B(CLUSTER_LIST &QUADS)
 	 int fidx_a3 = SYSTEM.PARENT[a3];
 	 int fidx_a4 = SYSTEM.PARENT[a4];
 			
-	 curr_pair_type_idx[0] =  get_pair_index(a1, a2, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP,
-																		SYSTEM.PARENT) ;
-	 curr_pair_type_idx[1] =  get_pair_index(a1, a3, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP,
-																		SYSTEM.PARENT) ;
-	 curr_pair_type_idx[2] =  get_pair_index(a1, a4, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP,
-																		SYSTEM.PARENT) ;
-	 curr_pair_type_idx[3] =  get_pair_index(a2, a3, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP,
-																		SYSTEM.PARENT) ;
-	 curr_pair_type_idx[4] =  get_pair_index(a2, a4, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP,
-																		SYSTEM.PARENT) ;
-	 curr_pair_type_idx[5] =  get_pair_index(a3, a4, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP,
-																		SYSTEM.PARENT) ;
+	 curr_pair_type_idx[0] =  get_pair_index(a1, a2, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP, SYSTEM.PARENT) ;
+	 curr_pair_type_idx[1] =  get_pair_index(a1, a3, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP, SYSTEM.PARENT) ;
+	 curr_pair_type_idx[2] =  get_pair_index(a1, a4, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP, SYSTEM.PARENT) ;
+	 curr_pair_type_idx[3] =  get_pair_index(a2, a3, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP, SYSTEM.PARENT) ;
+	 curr_pair_type_idx[4] =  get_pair_index(a2, a4, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP, SYSTEM.PARENT) ;
+	 curr_pair_type_idx[5] =  get_pair_index(a3, a4, SYSTEM.ATOMTYPE_IDX, CONTROLS.NATMTYP, SYSTEM.PARENT) ;
 	 atom_type_index[0] = SYSTEM.get_atomtype_idx(a1) ;
 	 atom_type_index[1] = SYSTEM.get_atomtype_idx(fidx_a2) ;
 	 atom_type_index[2] = SYSTEM.get_atomtype_idx(fidx_a3) ;
@@ -2493,38 +2586,40 @@ void Cheby::Force_4B(CLUSTER_LIST &QUADS)
 		x_diff[f] = FF_4BODY[curr_quad_type_index].X_DIFF[j] ;
 		x_avg[f]  = FF_4BODY[curr_quad_type_index].X_AVG[j] ;
 	 }
+     
+     // Different handling is needed depending on whether correlation terms (chains) are used. If not used, want original code behavior.
+     // If they are used, only need two distances within cutoff.
 
-	 // Before doing any polynomial/coeff set up, make sure that all ij, ik, and jk distances are within the allowed range.
-	 // Unlike the 2-body Cheby, extrapolation/refitting to handle behavior outside of fitting regime is not straightforward.
-			
-	 if( !FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[0], S_MINIM[0], S_MAXIM[0]))
-		continue;
-	 if( !FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[1], S_MINIM[1], S_MAXIM[1]))
-		continue;
-	 if( !FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[2], S_MINIM[2], S_MAXIM[2]))
-		continue;
-	 if( !FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[3], S_MINIM[3], S_MAXIM[3]))
-		continue;
-	 if( !FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[4], S_MINIM[4], S_MAXIM[4]))
-		continue;
-	 if( !FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[5], S_MINIM[5], S_MAXIM[5]))
-		continue;
+     // Can convert this PROCEED function to return integers once chain support implemented for 4b too...
+     
+	 proceed = 0;
+     
+     proceed_ij = FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[0], S_MINIM[0], S_MAXIM[0]);
+     proceed_ik = FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[1], S_MINIM[1], S_MAXIM[1]);
+     proceed_il = FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[2], S_MINIM[2], S_MAXIM[2]);
+     proceed_jk = FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[3], S_MINIM[3], S_MAXIM[3]);
+     proceed_jl = FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[4], S_MINIM[4], S_MAXIM[4]);
+     proceed_kl = FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.PROCEED(rlen[5], S_MINIM[5], S_MAXIM[5]);
+
+	 if( proceed_ij) proceed++;
+	 if( proceed_ik) proceed++;
+	 if( proceed_il) proceed++;
+     if( proceed_jk) proceed++;
+     if( proceed_jl) proceed++;
+     if( proceed_kl) proceed++;     
+     
+     if (proceed < proceed_criteria)      
+         continue;  
 				
      // At this point, all distances are within allowed ranges. We can now proceed to the force derivative calculation
 			
 	 // Set up the polynomials
-	 set_polys(curr_pair_type_idx[0], Tn_4b_ij, Tnd_4b_ij, rlen[0], x_diff[0], x_avg[0],
-			   FF_2BODY[curr_pair_type_idx[0]].SNUM_4B_CHEBY, S_MINIM[0]);
-	 set_polys(curr_pair_type_idx[1], Tn_4b_ik, Tnd_4b_ik, rlen[1], x_diff[1], x_avg[1]
-			   , FF_2BODY[curr_pair_type_idx[1]].SNUM_4B_CHEBY, S_MINIM[1]);
-	 set_polys(curr_pair_type_idx[2], Tn_4b_il, Tnd_4b_il, rlen[2], x_diff[2], x_avg[2],
-			   FF_2BODY[curr_pair_type_idx[2]].SNUM_4B_CHEBY, S_MINIM[2]);
-	 set_polys(curr_pair_type_idx[3], Tn_4b_jk, Tnd_4b_jk, rlen[3], x_diff[3], x_avg[3],
-			   FF_2BODY[curr_pair_type_idx[3]].SNUM_4B_CHEBY, S_MINIM[3]);
-	 set_polys(curr_pair_type_idx[4], Tn_4b_jl, Tnd_4b_jl, rlen[4], x_diff[4], x_avg[4],
-			   FF_2BODY[curr_pair_type_idx[4]].SNUM_4B_CHEBY, S_MINIM[4]);
-	 set_polys(curr_pair_type_idx[5], Tn_4b_kl, Tnd_4b_kl, rlen[5], x_diff[5], x_avg[5],
-			   FF_2BODY[curr_pair_type_idx[5]].SNUM_4B_CHEBY, S_MINIM[5]);
+	 set_polys(curr_pair_type_idx[0], Tn_4b_ij, Tnd_4b_ij, rlen[0], x_diff[0], x_avg[0], FF_2BODY[curr_pair_type_idx[0]].SNUM_4B_CHEBY, S_MINIM[0]);
+	 set_polys(curr_pair_type_idx[1], Tn_4b_ik, Tnd_4b_ik, rlen[1], x_diff[1], x_avg[1], FF_2BODY[curr_pair_type_idx[1]].SNUM_4B_CHEBY, S_MINIM[1]);
+	 set_polys(curr_pair_type_idx[2], Tn_4b_il, Tnd_4b_il, rlen[2], x_diff[2], x_avg[2], FF_2BODY[curr_pair_type_idx[2]].SNUM_4B_CHEBY, S_MINIM[2]);
+	 set_polys(curr_pair_type_idx[3], Tn_4b_jk, Tnd_4b_jk, rlen[3], x_diff[3], x_avg[3], FF_2BODY[curr_pair_type_idx[3]].SNUM_4B_CHEBY, S_MINIM[3]);
+	 set_polys(curr_pair_type_idx[4], Tn_4b_jl, Tnd_4b_jl, rlen[4], x_diff[4], x_avg[4], FF_2BODY[curr_pair_type_idx[4]].SNUM_4B_CHEBY, S_MINIM[4]);
+	 set_polys(curr_pair_type_idx[5], Tn_4b_kl, Tnd_4b_kl, rlen[5], x_diff[5], x_avg[5], FF_2BODY[curr_pair_type_idx[5]].SNUM_4B_CHEBY, S_MINIM[5]);
 
 	 // Set up the smoothing functions
 			
@@ -2539,10 +2634,40 @@ void Cheby::Force_4B(CLUSTER_LIST &QUADS)
 
 		for ( int f = 0 ; f < 6 ; f++ ) 
 		  powers[f] = FF_4BODY[curr_quad_type_index].ALLOWED_POWERS[i][pow_map[f]] ;
-
+          
+          
+          // Now that we have our powers, need to see if this is still a valid chain interaction
+          
+          if (proceed == 3) // If we're here with proceed == 2, then this is a USE_CHAINS calculation with a chain configuration
+          {
+              // In this case, need the powers corresponding to the two distances within cutoffs to be > 0
+              if ((proceed_ij) && (powers[0] == 0)) 
+                  continue;
+              if ((proceed_ik) && (powers[1] == 0))
+                  continue;
+              if ((proceed_il) && (powers[2] == 0))
+                  continue;              
+              if ((proceed_jk) && (powers[3] == 0)) 
+                  continue;
+              if ((proceed_jl) && (powers[4] == 0))
+                  continue;
+              if ((proceed_kl) && (powers[5] == 0))
+                  continue;                                    
+          }                                                  
+           
+          if(CONTROLS.USE_CHAINS)
+          {
+              FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[0], fcut_4b[0], fcut_deriv_4b[0]);
+              FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[1], fcut_4b[1], fcut_deriv_4b[1]);
+              FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[2], fcut_4b[2], fcut_deriv_4b[2]);
+              FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[3], fcut_4b[3], fcut_deriv_4b[3]);
+              FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[4], fcut_4b[4], fcut_deriv_4b[4]);
+              FF_4BODY[curr_quad_type_index].FORCE_CUTOFF.get_chains(powers[5], fcut_4b[5], fcut_deriv_4b[5]);
+          }          
+          
 
 		SYSTEM.TOT_POT_ENER += coeff 
-		                     * fcut_4b[0] 
+		             * fcut_4b[0] 
 				     * fcut_4b[1] 
 				     * fcut_4b[2] 
 				     * fcut_4b[3] 
@@ -2562,18 +2687,12 @@ void Cheby::Force_4B(CLUSTER_LIST &QUADS)
 		deriv_4b[4] = fcut_4b[4] * Tnd_4b_jl[powers[4]] + fcut_deriv_4b[4] * Tn_4b_jl[powers[4]];
 		deriv_4b[5] = fcut_4b[5] * Tnd_4b_kl[powers[5]] + fcut_deriv_4b[5] * Tn_4b_kl[powers[5]];
 				
-		force_4b[0]  = coeff * deriv_4b[0] * fcut_4b[1] * fcut_4b[2] * fcut_4b[3] * fcut_4b[4] * fcut_4b[5]
-			* Tn_4b_ik[powers[1]]  * Tn_4b_il[powers[2]]  * Tn_4b_jk[powers[3]]  * Tn_4b_jl[powers[4]]  * Tn_4b_kl[powers[5]];
-		force_4b[1]  = coeff * deriv_4b[1] * fcut_4b[0] * fcut_4b[2] * fcut_4b[3] * fcut_4b[4] * fcut_4b[5]
-			* Tn_4b_ij[powers[0]]  * Tn_4b_il[powers[2]]  * Tn_4b_jk[powers[3]]  * Tn_4b_jl[powers[4]]  * Tn_4b_kl[powers[5]];
-		force_4b[2]  = coeff * deriv_4b[2] * fcut_4b[0] * fcut_4b[1] * fcut_4b[3] * fcut_4b[4] * fcut_4b[5]
-			* Tn_4b_ij[powers[0]]  * Tn_4b_ik[powers[1]]  * Tn_4b_jk[powers[3]]  * Tn_4b_jl[powers[4]]  * Tn_4b_kl[powers[5]];
-		force_4b[3]  = coeff * deriv_4b[3] * fcut_4b[0] * fcut_4b[1] * fcut_4b[2] * fcut_4b[4] * fcut_4b[5]
-			* Tn_4b_ij[powers[0]]  * Tn_4b_ik[powers[1]]  * Tn_4b_il[powers[2]]  * Tn_4b_jl[powers[4]]  * Tn_4b_kl[powers[5]];
-		force_4b[4]  = coeff * deriv_4b[4] * fcut_4b[0] * fcut_4b[1] * fcut_4b[2] * fcut_4b[3] * fcut_4b[5]
-			* Tn_4b_ij[powers[0]]  * Tn_4b_ik[powers[1]]  * Tn_4b_il[powers[2]]  * Tn_4b_jk[powers[3]]  * Tn_4b_kl[powers[5]];
-		force_4b[5]  = coeff * deriv_4b[5] * fcut_4b[0] * fcut_4b[1] * fcut_4b[2] * fcut_4b[3] * fcut_4b[4]
-			* Tn_4b_ij[powers[0]]  * Tn_4b_ik[powers[1]]  * Tn_4b_il[powers[2]]  * Tn_4b_jk[powers[3]]  * Tn_4b_jl[powers[4]];
+		force_4b[0]  = coeff * deriv_4b[0] * fcut_4b[1] * fcut_4b[2] * fcut_4b[3] * fcut_4b[4] * fcut_4b[5] * Tn_4b_ik[powers[1]]  * Tn_4b_il[powers[2]]  * Tn_4b_jk[powers[3]]  * Tn_4b_jl[powers[4]]  * Tn_4b_kl[powers[5]];
+		force_4b[1]  = coeff * deriv_4b[1] * fcut_4b[0] * fcut_4b[2] * fcut_4b[3] * fcut_4b[4] * fcut_4b[5] * Tn_4b_ij[powers[0]]  * Tn_4b_il[powers[2]]  * Tn_4b_jk[powers[3]]  * Tn_4b_jl[powers[4]]  * Tn_4b_kl[powers[5]];
+		force_4b[2]  = coeff * deriv_4b[2] * fcut_4b[0] * fcut_4b[1] * fcut_4b[3] * fcut_4b[4] * fcut_4b[5] * Tn_4b_ij[powers[0]]  * Tn_4b_ik[powers[1]]  * Tn_4b_jk[powers[3]]  * Tn_4b_jl[powers[4]]  * Tn_4b_kl[powers[5]];
+		force_4b[3]  = coeff * deriv_4b[3] * fcut_4b[0] * fcut_4b[1] * fcut_4b[2] * fcut_4b[4] * fcut_4b[5] * Tn_4b_ij[powers[0]]  * Tn_4b_ik[powers[1]]  * Tn_4b_il[powers[2]]  * Tn_4b_jl[powers[4]]  * Tn_4b_kl[powers[5]];
+		force_4b[4]  = coeff * deriv_4b[4] * fcut_4b[0] * fcut_4b[1] * fcut_4b[2] * fcut_4b[3] * fcut_4b[5] * Tn_4b_ij[powers[0]]  * Tn_4b_ik[powers[1]]  * Tn_4b_il[powers[2]]  * Tn_4b_jk[powers[3]]  * Tn_4b_kl[powers[5]];
+		force_4b[5]  = coeff * deriv_4b[5] * fcut_4b[0] * fcut_4b[1] * fcut_4b[2] * fcut_4b[3] * fcut_4b[4] * Tn_4b_ij[powers[0]]  * Tn_4b_ik[powers[1]]  * Tn_4b_il[powers[2]]  * Tn_4b_jk[powers[3]]  * Tn_4b_jl[powers[4]];
 
 #if(0) // Print debug info
 		
