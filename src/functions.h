@@ -494,9 +494,9 @@ public:
 
 	 void UPDATE_LIST(FRAME & SYSTEM, JOB_CONTROL & CONTROLS);	// Will check if lists need updating, and will call DO_UPDATE do so if need be
 	 //void UPDATE_LIST(FRAME & SYSTEM, JOB_CONTROL & CONTROLS, bool FORCE);
-	 void INITIALIZE(FRAME & SYSTEM);
+	 void INITIALIZE(FRAME & SYSTEM, JOB_CONTROL &CONTROLS);
 	 void INITIALIZE_MD(FRAME & SYSTEM, JOB_CONTROL &CONTROLS) ;
-	 void INITIALIZE(FRAME & SYSTEM, double & PAD);
+	 void INITIALIZE(FRAME & SYSTEM, double & PAD, JOB_CONTROL &CONTROLS);
 	 void DO_UPDATE (FRAME & SYSTEM, JOB_CONTROL & CONTROLS);	// Builds and/or updates neighbor list
 
 	 double MAX_ALL_CUTOFFS() ;

@@ -980,6 +980,7 @@ void Cheby::Deriv_3B(A_MAT & A_MATRIX, CLUSTER_LIST &TRIPS)
     
     // Different handling of fcut proceed criteria depending on whether correlation terms (chains) are used
     
+    bool proceed_ij, proceed_ik, proceed_jk;
     int proceed;
     int proceed_criteria;
         
@@ -1064,13 +1065,17 @@ void Cheby::Deriv_3B(A_MAT & A_MATRIX, CLUSTER_LIST &TRIPS)
                 // If they are used, only need two distances within cutoff.
 
                 // Can convert this PROCEED function to return integers once chain support implemented for 4b too...
+                
 
-				if( PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ij, S_MINIM_IJ, S_MAXIM_IJ))
-				    proceed++;
-				if( PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ik, S_MINIM_IK, S_MAXIM_IK))
-					proceed++;
-				if( PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_jk, S_MINIM_JK, S_MAXIM_JK))
-					proceed++;
+		        proceed = 0;
+                
+                proceed_ij = PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ij, S_MINIM_IJ, S_MAXIM_IJ);
+                proceed_ik = PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_ik, S_MINIM_IK, S_MAXIM_IK);
+                proceed_jk = PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.PROCEED(rlen_jk, S_MINIM_JK, S_MAXIM_JK);
+
+				if( proceed_ij) proceed++;
+				if( proceed_ik) proceed++;
+				if( proceed_jk) proceed++;
                 
                 if (proceed >= proceed_criteria)
 				{		
@@ -1157,7 +1162,17 @@ void Cheby::Deriv_3B(A_MAT & A_MATRIX, CLUSTER_LIST &TRIPS)
 						set_3b_powers(PAIR_TRIPLETS[curr_triple_type_index], pair_index, i, pow_ij, pow_ik, pow_jk) ;
                          
                         // Now that we have our powers, need to see if this is still a valid chain interaction
-                         
+                        
+                        if (proceed == 2) // If we're here with proceed == 2, then this is a USE_CHAINS calculation with a chain configuration
+                        {
+                            // In this case, need the powers corresponding to the two distances within cutoffs to be > 0
+                            if ((proceed_ij) && (pow_ij == 0)) 
+                                continue;
+                            if ((proceed_ik) && (pow_ik == 0))
+                                continue;
+                            if ((proceed_jk) && (pow_jk == 0))
+                                continue;   
+                        }                                                  
                          
                         if(CONTROLS.USE_CHAINS)
                         {
@@ -1165,6 +1180,7 @@ void Cheby::Deriv_3B(A_MAT & A_MATRIX, CLUSTER_LIST &TRIPS)
                             PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_chains(pow_ik, fcut_ik, fcutderiv_ik);
                             PAIR_TRIPLETS[curr_triple_type_index].FORCE_CUTOFF.get_chains(pow_jk, fcut_jk, fcutderiv_jk);
                         }
+                        
                         
 
 						deriv_ij =  fcut_ij * Tnd_ij[pow_ij] + fcutderiv_ij * Tn_ij[pow_ij] ;

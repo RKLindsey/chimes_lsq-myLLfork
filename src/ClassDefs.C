@@ -41,11 +41,15 @@ NEIGHBORS::NEIGHBORS()
 }
 NEIGHBORS::~NEIGHBORS(){}	// Deconstructor
 
-void NEIGHBORS::INITIALIZE(FRAME & SYSTEM)		// (overloaded) class constructor -- if no padding specified, default to 0.3
+void NEIGHBORS::INITIALIZE(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)		// (overloaded) class constructor -- if no padding specified, default to 0.3
 {
-	 LIST          .resize(SYSTEM.ATOMS);
-	 LIST_EWALD    .resize(SYSTEM.ATOMS);
-	 LIST_UNORDERED.resize(SYSTEM.ATOMS);
+	int UPPER_LIMIT = SYSTEM.ATOMS;
+     if (CONTROLS.USE_CHAINS)
+        UPPER_LIMIT = SYSTEM.ALL_ATOMS;
+
+	 LIST          .resize(UPPER_LIMIT);
+	 LIST_EWALD    .resize(UPPER_LIMIT);
+	 LIST_UNORDERED.resize(UPPER_LIMIT);
 	 LIST_3B       .resize(SYSTEM.ALL_ATOMS);
 	 LIST_4B       .resize(SYSTEM.ALL_ATOMS);
 		
@@ -68,7 +72,7 @@ void NEIGHBORS::INITIALIZE(FRAME & SYSTEM)		// (overloaded) class constructor --
 
 void NEIGHBORS::INITIALIZE_MD(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)		// (overloaded) class constructor -- if no padding specified, default to 0.3
 {
-	INITIALIZE(SYSTEM);
+	INITIALIZE(SYSTEM, CONTROLS);
 		
 	MAX_VEL = -1.0;
 
@@ -88,9 +92,9 @@ void NEIGHBORS::INITIALIZE_MD(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)		// (overlo
 	}
 }
 
-void NEIGHBORS::INITIALIZE(FRAME & SYSTEM, double & PAD)	// (overloaded) class constructor -- if padding specified, set to value
+void NEIGHBORS::INITIALIZE(FRAME & SYSTEM, double & PAD, JOB_CONTROL & CONTROLS)	// (overloaded) class constructor -- if padding specified, set to value
 {
-	INITIALIZE(SYSTEM);
+	INITIALIZE(SYSTEM, CONTROLS);
 	
 	if (USE)
 		RCUT_PADDING = PAD;
@@ -205,16 +209,26 @@ void NEIGHBORS::DO_UPDATE_SMALL(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)
 void NEIGHBORS::DO_UPDATE_BIG(FRAME & SYSTEM, JOB_CONTROL & CONTROLS) 
 // Order-N Neighbor list update with binning of particles.
 {
+	cout << "IN_BIG" << endl;
+
 	XYZ RAB;
 	double rlen = 0;
-	
+    
+    
+	int UPPER_LIMIT = SYSTEM.ATOMS;
+     if (CONTROLS.USE_CHAINS)
+        UPPER_LIMIT = SYSTEM.ALL_ATOMS;
+
+
+
+cout << "FYI: " << UPPER_LIMIT << " " << CONTROLS.USE_CHAINS << endl;     
 	if(FIRST_CALL) // Set up the first dimension of the list 
 	{
-		LIST          .resize(SYSTEM.ATOMS);	
-		LIST_EWALD    .resize(SYSTEM.ATOMS);	
-		LIST_UNORDERED.resize(SYSTEM.ATOMS);	
-		LIST_3B       .resize(SYSTEM.ATOMS);
-		LIST_4B       .resize(SYSTEM.ATOMS);	
+		LIST          .resize(UPPER_LIMIT);	
+		LIST_EWALD    .resize(UPPER_LIMIT);	
+		LIST_UNORDERED.resize(UPPER_LIMIT);	
+		LIST_3B       .resize(UPPER_LIMIT);
+		LIST_4B       .resize(UPPER_LIMIT);	
 	}
 
 	for ( int j = 0 ; j < PERM_SCALE.size() ; j++ ) {
@@ -268,13 +282,6 @@ void NEIGHBORS::DO_UPDATE_BIG(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)
 		BIN_IDX.Y = floor( (SYSTEM.ALL_COORDS[a1].Y - SYSTEM.BOXDIM.ylo + SYSTEM.BOXDIM.EXTENT_Y * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
 		BIN_IDX.Z = floor( (SYSTEM.ALL_COORDS[a1].Z - SYSTEM.BOXDIM.zlo + SYSTEM.BOXDIM.EXTENT_Z * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
 
-		/* RKL - no longer used - 082319
-					
-		BIN_IDX.X = floor( (SYSTEM.ALL_COORDS[a1].X + SYSTEM.BOXDIM.X * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
-		BIN_IDX.Y = floor( (SYSTEM.ALL_COORDS[a1].Y + SYSTEM.BOXDIM.Y * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
-		BIN_IDX.Z = floor( (SYSTEM.ALL_COORDS[a1].Z + SYSTEM.BOXDIM.Z * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
-		*/
-
 		if ( BIN_IDX.X < 0        || BIN_IDX.Y < 0        || BIN_IDX.Z < 0 ||
 			 BIN_IDX.X >= NBINS.X || BIN_IDX.Y >= NBINS.Y || BIN_IDX.Z >= NBINS.Z) 
 		{
@@ -302,8 +309,8 @@ void NEIGHBORS::DO_UPDATE_BIG(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)
 		
 			
 	}
-
-	for(int a1=0; a1<SYSTEM.ATOMS; a1++)
+    
+	for(int a1=0; a1<UPPER_LIMIT; a1++)
 	{
 		if(!FIRST_CALL)
 		{
@@ -319,13 +326,6 @@ void NEIGHBORS::DO_UPDATE_BIG(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)
 		BIN_IDX_a1.X = floor( (SYSTEM.ALL_COORDS[a1].X - SYSTEM.BOXDIM.xlo + SYSTEM.BOXDIM.EXTENT_X * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
 		BIN_IDX_a1.Y = floor( (SYSTEM.ALL_COORDS[a1].Y - SYSTEM.BOXDIM.ylo + SYSTEM.BOXDIM.EXTENT_Y * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
 		BIN_IDX_a1.Z = floor( (SYSTEM.ALL_COORDS[a1].Z - SYSTEM.BOXDIM.zlo + SYSTEM.BOXDIM.EXTENT_Z * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
-		
-		/* RKL - no longer used - 082319
-
-		BIN_IDX_a1.X = floor( (SYSTEM.ALL_COORDS[a1].X + SYSTEM.BOXDIM.X * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
-		BIN_IDX_a1.Y = floor( (SYSTEM.ALL_COORDS[a1].Y + SYSTEM.BOXDIM.Y * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
-		BIN_IDX_a1.Z = floor( (SYSTEM.ALL_COORDS[a1].Z + SYSTEM.BOXDIM.Z * CONTROLS.N_LAYERS) / SEARCH_DIST ) + 1;
-		*/
 		
 		if ( BIN_IDX_a1.X < 1 || BIN_IDX_a1.Y < 1 || BIN_IDX_a1.Z < 1 ) 
 		{
@@ -370,7 +370,7 @@ void NEIGHBORS::DO_UPDATE_BIG(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)
 						if (rlen < MAX_CUTOFF + RCUT_PADDING)		
 							LIST_UNORDERED[a1].push_back(a2);	
 						
-						if ( a1 <= SYSTEM.PARENT[a2] ) 
+						if (( a1 <= SYSTEM.PARENT[a2] ) || (CONTROLS.USE_CHAINS)) 
 						{
 							if (rlen < (MAX_CUTOFF + RCUT_PADDING) )		
 								LIST[a1].push_back(a2);		
@@ -1528,29 +1528,29 @@ void NEIGHBORS::UPDATE_3B_INTERACTION(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)
     
     if (CONTROLS.USE_CHAINS)
     {
+	cout << "in a" << endl;
+
     	for ( int i = 0; i < SYSTEM.ATOMS; i++ ) 
     	{
             ai = i;
             
-    		for ( int j = 0; j < LIST_3B[i].size(); j++ ) 
+    		for ( int j = 0; j < LIST_3B[ai].size(); j++ ) 
     		{
-    			aj = LIST_3B[i][j];
+    			aj = LIST_3B[ai][j];
                 
     			for ( int k = 0; k < LIST_3B[aj].size(); k++ ) 
     			{
-    			    ak = LIST_3B[j][k];
+    			    ak = LIST_3B[aj][k];
                     
     				if ( ai == ak )
-    				{
     					continue;
-    				}
-    				else if ( PERM_SCALE[3] == 1.0 && SYSTEM.PARENT[ai] > SYSTEM.PARENT[ak] )
-    				{
+    				
+    				else if (( PERM_SCALE[3] == 1.0) && (SYSTEM.PARENT[ai] > SYSTEM.PARENT[ak]) )
     					 continue ;
-    				}                    
+    				                    
 				
     				// The j-k list is possibly outside of the cutoff, so test it here.
-    				double rlen = get_dist(SYSTEM, RAB, aj, ak);
+    				double rlen = get_dist(SYSTEM, RAB, ai, ak);
 	
     				if ( rlen < MAX_CUTOFF_3B + RCUT_PADDING ) 
     				{
@@ -1563,10 +1563,13 @@ void NEIGHBORS::UPDATE_3B_INTERACTION(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)
     			}
     		}
     	}
+
+	cout << "Finished a" << endl;
         
     }
     else
     {
+	    cout << "in b" << endl;
     	for ( int i = 0; i < SYSTEM.ATOMS; i++ ) 
     	{
     		int ai = i;
