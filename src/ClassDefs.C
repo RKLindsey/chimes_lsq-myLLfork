@@ -209,8 +209,6 @@ void NEIGHBORS::DO_UPDATE_SMALL(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)
 void NEIGHBORS::DO_UPDATE_BIG(FRAME & SYSTEM, JOB_CONTROL & CONTROLS) 
 // Order-N Neighbor list update with binning of particles.
 {
-	cout << "IN_BIG" << endl;
-
 	XYZ RAB;
 	double rlen = 0;
     
@@ -219,9 +217,6 @@ void NEIGHBORS::DO_UPDATE_BIG(FRAME & SYSTEM, JOB_CONTROL & CONTROLS)
      if (CONTROLS.USE_CHAINS)
         UPPER_LIMIT = SYSTEM.ALL_ATOMS;
 
-
-
-cout << "FYI: " << UPPER_LIMIT << " " << CONTROLS.USE_CHAINS << endl;     
 	if(FIRST_CALL) // Set up the first dimension of the list 
 	{
 		LIST          .resize(UPPER_LIMIT);	
@@ -1543,10 +1538,15 @@ void NEIGHBORS::UPDATE_3B_INTERACTION(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)
     				if ( ai == ak )
     					continue;
     				
-    				else if (( PERM_SCALE[3] == 1.0) && (SYSTEM.PARENT[ai] > SYSTEM.PARENT[ak]) )
+    				else if (( PERM_SCALE[3] == 1.0) && (SYSTEM.PARENT[ai] > SYSTEM.PARENT[aj]) )
     					 continue ;
     				                    
+    				else if (( PERM_SCALE[3] == 1.0) && (SYSTEM.PARENT[ai] > SYSTEM.PARENT[ak]) )
+    					 continue ;
 				
+    				else if (( PERM_SCALE[3] == 1.0) && (SYSTEM.PARENT[aj] > SYSTEM.PARENT[ak]) )
+					continue;
+
     				// For chain configurations, we don't care if ai and ak are outside of the cutoff
     				//double rlen = get_dist(SYSTEM, RAB, ai, ak);
 	
@@ -1555,7 +1555,7 @@ void NEIGHBORS::UPDATE_3B_INTERACTION(FRAME & SYSTEM, JOB_CONTROL &CONTROLS)
     					inter.a1 = ai;
     					inter.a2 = aj;
     					inter.a3 = ak;
-	  
+
     					LIST_3B_INT.push_back(inter);
     				//}
     			}
